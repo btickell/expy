@@ -78,7 +78,10 @@ def start_run(exp_name, params):
     coll.update_one({'expName': exp_name}, {'$push': {'runs': run_doc}})
     return _logger 
 
-
+def continue_run(exp_name, runID):
+    _logger.configure(LOG_ROOT, prefix=exp_name + '/' + runID)  
+    return _logger 
+    
 def dir_zip(root, output_file, excludes=[]):
     cmd = "zip -r {} {}".format(output_file, root)
     for exclude_str in excludes:
@@ -91,7 +94,7 @@ def _clean(s):
 
 def get_gitcommit():
     raw_output = subprocess.check_output(["git", "rev-list", "--max-parents=0", "HEAD"])
-    return _clean(raw_output) = # get rid of leading white space and decode from bytes
+    return _clean(raw_output) # get rid of leading white space and decode from bytes
 
 def get_gitbranch():
     raw_output = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])

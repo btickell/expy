@@ -5,6 +5,9 @@ import shutil
 import subprocess
 import pymongo
 from ml_logger import logger as _logger
+
+from expy import notes
+
 MONGO_CLIENT = pymongo.MongoClient()
 
 
@@ -48,6 +51,7 @@ def make_experiment(exp_name, project_dir=None, track_git=True):
     arg_dict = {}
     expID = make_id(32)
     arg_dict['expID'] = expID
+    arg_dict['script'] = sys.argv[0]
     _logger.configure(LOG_ROOT, prefix=exp_name)
     if project_dir:
         dir_zip(PROJECT_ROOT, output_file='source.zip', excludes=["*.ckpt*", "*tmp_dir*", "*.mp4", "*.png", "*data*", "*.pkl", "*.git*"])
@@ -85,3 +89,35 @@ def get_gitinfo():
     commit_unclean = subprocess.check_output(["git", "rev-list", "--max-parents=0", "HEAD"])
     s = commit_unclean.strip().decode() # get rid of leading white space and decode from bytes
     return s
+
+
+def main():
+    import sys
+    args = sys.argv[1:]
+    cmd = args[0]
+    if cmd == "note":
+        mode = args[1] # add or read
+        id = args[2]
+        col = get_exp_coll()
+        exp_doc = col.find_one({'expID': id})
+        
+        if exp_doc is None:
+            print('Experiment not found with id: {}'.format(id))
+            exit()
+        else:
+            path = exp_doc['logdir']
+            note_file = os.path.join(path, 'notes.txt')
+            if mode == 'read':
+                with open(note_file, 'r') as f:
+                    note_txt = f.read()
+                    print('{}'.format(exp_doc['expName']))
+                    print()
+                    print(note_txt)
+
+            elif mode == 'add':
+                subprocess.call(['vim', note_file])
+            else:
+                print('Unrecognized command {} for note, try:: add / read'.format(cmd))
+
+if __name__ == "__main__":
+    main()

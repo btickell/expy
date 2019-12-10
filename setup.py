@@ -2,6 +2,7 @@ from setuptools import setup
 
 
 setup(name="expy",
-      version=0.0,      
+      version=0.1,      
       packages=["expy"],
-      install_requires=["ml_logger"])
+     # install_requires=["ml_logger"],
+      entry_points={'console_scripts': ['tracker = expy.tracker:main']})

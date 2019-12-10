@@ -45,20 +45,21 @@ def remove_experiment(exp_name):
     else:
         print('Invalid response ... aborting.')
 
-def make_experiment(exp_name, project_dir=None, track_git=True):
+def make_experiment(exp_name, zip_project=False, track_git=True):
     # create experiment :: need to add any information here that is relevant.
     assert not exp_exists(exp_name), """experiment with this name already exists, either remove the existing version or rename the new launch."""
     arg_dict = {}
     expID = make_id(32)
     arg_dict['expID'] = expID
-    arg_dict['script'] = sys.argv[0]
+    arg_dict['script'] = sys.argv[0] # TODO: check that this is the correct approach.
     _logger.configure(LOG_ROOT, prefix=exp_name)
-    if project_dir:
+    if zip_project:
         dir_zip(PROJECT_ROOT, output_file='source.zip', excludes=["*.ckpt*", "*tmp_dir*", "*.mp4", "*.png", "*data*", "*.pkl", "*.git*"])
         shutil.move('source.zip', os.path.join(LOG_ROOT, exp_name + '/'  + 'source.zip'))
     if track_git:
-        git_tag = get_gitinfo()
-        arg_dict['gitcommit'] = git_tag
+        arg_dict['gitcommit'] = get_gitcommit()
+        arg_dict['gitbranch'] = get_gitbranch()
+        
     _logger.log_params(Args={'expID': expID})
     exp_doc = {'expID': expID, 'expName': exp_name, 'logdir': os.path.join(LOG_ROOT, exp_name)}
     coll = get_exp_coll()
@@ -85,11 +86,16 @@ def dir_zip(root, output_file, excludes=[]):
         
     subprocess.run(cmd, shell=True)
 
-def get_gitinfo():
-    commit_unclean = subprocess.check_output(["git", "rev-list", "--max-parents=0", "HEAD"])
-    s = commit_unclean.strip().decode() # get rid of leading white space and decode from bytes
-    return s
+def _clean(s):
+    return s.strip().decode()
 
+def get_gitcommit():
+    raw_output = subprocess.check_output(["git", "rev-list", "--max-parents=0", "HEAD"])
+    return _clean(raw_output) = # get rid of leading white space and decode from bytes
+
+def get_gitbranch():
+    raw_output = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
+    return _clean(raw_output)
 
 def main():
     import sys

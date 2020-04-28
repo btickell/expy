@@ -1,12 +1,12 @@
 import os
+import sys
 import random
 from string import hexdigits
 import shutil
 import subprocess
 import pymongo
 from ml_logger import logger as _logger
-
-from expy import notes
+import datetime
 
 MONGO_CLIENT = pymongo.MongoClient()
 
@@ -16,6 +16,13 @@ PROJECT_ROOT = os.environ['PROJECT_ROOT']
 
 def get_exp_coll():
     return MONGO_CLIENT.get_database('experiments')['experiments']
+
+def get_run_doc(exp_name, runID=None):
+    db = get_exp_coll()
+    exp_doc = db.find_one({'expName': exp_name})
+    for run_doc in exp_doc['runs']:
+        if run_doc['runID'] == runID:
+            return run_doc
 
 def make_id(length):
     string = "".join([random.choice(hexdigits.lower()) for _ in range(length)])
@@ -61,21 +68,41 @@ def make_experiment(exp_name, zip_project=False, track_git=True):
         arg_dict['gitbranch'] = get_gitbranch()
         
     _logger.log_params(Args={'expID': expID})
-    exp_doc = {'expID': expID, 'expName': exp_name, 'logdir': os.path.join(LOG_ROOT, exp_name)}
+    timestamp = datetime.datetime.now().strftime("%x :: %X")
+   
+    exp_doc = {
+        'expID': expID, 'expName': exp_name, 
+        'logdir': os.path.join(LOG_ROOT, exp_name),
+        'time': timestamp    
+    }
+
     coll = get_exp_coll()
     coll.insert(exp_doc)
     return expID
 
-def start_run(exp_name, params):
+def get_exp_doc(exp_name):
+    db = get_exp_coll()
+    return db.find_one({'expName': exp_name})
+def start_run(exp_name, params, runID=None):
     coll = get_exp_coll()
-    runID = make_id(8)
+    if runID is None:
+        runID = make_id(8)
+    
+    run_tstamp = datetime.datetime.now().strftime("%x :: %X")
+
+    script_txt = ' '.join(sys.argv)
     run_doc = {
         'runID': runID,
         'params': params,
-        'runpath': os.path.join(LOG_ROOT, exp_name + '/' + runID)
+        'runpath': os.path.join(LOG_ROOT, exp_name + '/' + runID),
+        'script': sys.argv[0],
+        'command': script_txt,
+        'timestamp': run_tstamp
     }
     _logger.configure(LOG_ROOT, prefix=exp_name + '/' + runID)  
     coll.update_one({'expName': exp_name}, {'$push': {'runs': run_doc}})
+    _logger.log_params(Args=params)
+    
     return _logger 
 
 def continue_run(exp_name, runID):
@@ -101,8 +128,9 @@ def get_gitbranch():
     return _clean(raw_output)
 
 def main():
-    import sys
     args = sys.argv[1:]
+    if len(args) == 0:
+        exit()
     cmd = args[0]
     if cmd == "note":
         mode = args[1] # add or read
@@ -127,6 +155,9 @@ def main():
                 subprocess.call(['vim', note_file])
             else:
                 print('Unrecognized command {} for note, try:: add / read'.format(cmd))
+    if cmd == "remove":
+        exp_name = args[1]
+        remove_experiment(exp_name)
 
 if __name__ == "__main__":
     main()
